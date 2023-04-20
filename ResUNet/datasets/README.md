@@ -7,7 +7,7 @@
 
 ```bash
 .
-├── TransUNet
+├── ResUNet
 │   ├──datasets
 │   │       └── dataset_*.py
 │   ├──train.py

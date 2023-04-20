@@ -16,7 +16,6 @@ from utils.util import make_dataframe, DF_NAMES
 from utils.custom_metrics import *
 from utils.config import get_device
 from models.TransformerUNetParallel import TransformerUNetParallel
-from models.TransformerUNet import TransformerUNet
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
@@ -62,13 +61,15 @@ def test(args, model):
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
 
-    trainloader = DataLoader(db_train, batch_size=args.batch_size, shuffle=True, num_workers=4, pin_memory=True,
+    trainloader = DataLoader(db_train, batch_size=1, shuffle=True, num_workers=4, pin_memory=True,
                              worker_init_fn=worker_init_fn)
 
     model.eval()
     mse_loss = MSELoss()
     iter_num = 0
     thresh = 1
+    image_mediain, image_zscore = 507.818164131981, 494.769551727535
+    label_mediain, label_zscore = 214.225161179837, 749.515729320872
 
     loss_bank = []
     nrmse_bank = []
@@ -82,7 +83,7 @@ def test(args, model):
     with torch.no_grad():
         for i_batch, sampled_batch in enumerate(trainloader):
             image_batch, label_batch = sampled_batch['image'], sampled_batch['label']
-            # image_batch, label_batch = image_batch.cuda(), label_batch.cuda()
+            image_batch, label_batch = image_batch.cuda(), label_batch.cuda()
             # image_batch, label_batch = Variable(image_batch.to(device=args.device)), label_batch.to(device='cuda:0')
             outputs = model(image_batch)
 
@@ -102,14 +103,10 @@ def test(args, model):
                 prediction = torch.squeeze(outputs[k]).cpu().numpy()
                 _image = torch.squeeze(image_batch[k]).cpu().numpy()
                 _label = torch.squeeze(label_batch[k]).cpu().numpy()
-                # image(1,128,128)
 
-                # imageio.imwrite(f'{save_path}/{i_batch}_{k}_prediction.jpg', prediction)
-                # imageio.imwrite(f'{save_path}/{i_batch}_{k}_image.jpg', _image)
-                # imageio.imwrite(f'{save_path}/{i_batch}_{k}_label.jpg', _label)
-                # save_image(prediction, f'{save_path}/{i_batch}_{k}_prediction.png')
-                # save_image(_image, f'{save_path}/{i_batch}_{k}_image.png')
-                # save_image(_label, f'{save_path}/{i_batch}_{k}_label.png')
+                # _image = unzscore(_image, image_mediain, image_zscore)
+                # prediction = unzscore(prediction, image_mediain, image_zscore)
+                # _label = unzscore(_label, label_mediain, label_zscore)
 
                 tifffile.imwrite(f'{save_path}/{i_batch}_{k}_prediction.tif', data=prediction)
                 tifffile.imwrite(f'{save_path}/{i_batch}_{k}_image.tif', data=_image)
@@ -128,8 +125,8 @@ def test(args, model):
             frames_meta.loc[iter_num - 1] = meta_row
 
             # record
-            # loss_bank.append(loss.item())
-            loss_bank.append(mse)
+            loss_bank.append(loss.item())
+            # loss_bank.append(mse)
             nrmse_bank.append(nrmse)
             pcc_bank.append(pcc)
             dice_bank.append(dice)
@@ -167,7 +164,7 @@ if __name__ == "__main__":
     dataset_config = {
         'Synapse': {
             'Dataset': Synapse_dataset,
-            'volume_path': '/home/dataset/npy_1024/test',
+            'volume_path': '/home/dataset/npy_256/test',
             'label_dir': '/home/dataset/npy_256/test_label',
             'num_classes': 9,
         },
@@ -184,11 +181,11 @@ if __name__ == "__main__":
     is_residual = True
     bias = True
     heads = 4
-    size = (512, 512)
+    size = (128, 128)
     # channels = (3, 32, 64, 128)
     # is_residual = True
     # bias = True
-    # heads = 4
+    # heads = 2
     # size = (128, 128)
 
     model_path = f'res_{is_residual}_head_{heads}_ch_{channels[-1]}'
@@ -202,18 +199,16 @@ if __name__ == "__main__":
 
     # name the same snapshot defined in train script!
     args.model_name = "UTransform"
-    args.exp = 'TU_' + dataset_name + str(args.img_size)
+    args.exp = 'TU_' + dataset_name + str(args.size[0])
     snapshot_path = "../model/{}/{}".format(args.exp, args.model_path)
 
-    # model = TransformerUNetParallel(channels, heads, size[0], is_residual, bias)
-    model = TransformerUNet(channels, heads, is_residual, bias)
-
+    model = TransformerUNetParallel(channels, heads, size[0], is_residual, bias)
     # load checkpoint
     snapshot = os.path.join(snapshot_path, 'best_model.pth')
     if not os.path.exists(snapshot): snapshot = snapshot.replace('best_model', f'{args.model_name}-' + str(102))
     print('snapshot', snapshot, os.path.exists(snapshot))
 
-    model.load_state_dict(torch.load(snapshot,map_location='cpu'), strict=False)
+    model.load_state_dict(torch.load(snapshot), strict=False)
     snapshot_name = snapshot_path.split('/')[-1]
 
     log_folder = './test_log/test_log_' + args.exp
