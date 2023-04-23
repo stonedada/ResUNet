@@ -53,7 +53,7 @@ class Synapse_dataset(Dataset):
         else:
             slice_name = self.sample_list[idx].strip('\n')
             data_path = os.path.join(self.data_dir, slice_name)
-            label_name = slice_name.replace('c001', 'c000').replace('sl0-3', 'sl0-1')
+            label_name = slice_name.replace('c001', 'c000')
             label_path = self.label_dir + label_name
             image = np.load(data_path)
             print('image shape:', image.shape)
@@ -62,5 +62,5 @@ class Synapse_dataset(Dataset):
         sample = {'image': image, 'label': label}
         if self.transform:
             sample = self.transform(sample)
-        sample['case_name'] = self.sample_list[idx].strip('\n')
+        sample['case_name'] = self.sample_list[idx].split('.')[0]
         return sample

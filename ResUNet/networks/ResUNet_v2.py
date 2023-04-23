@@ -12,11 +12,11 @@ class ResidualConv(nn.Module):
             ),
             nn.ReLU(),
             nn.BatchNorm2d(output_dim),
-            nn.Dropout(),
+            nn.Dropout(p=0.2),
             nn.Conv2d(output_dim, output_dim, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(output_dim),
-            nn.Dropout(),
+            nn.Dropout(p=0.2),
         )
         self.conv_skip = nn.Sequential(
             nn.AvgPool2d(kernel_size=2),
@@ -37,11 +37,11 @@ class UpResidualConv(nn.Module):
             ),
             nn.ReLU(),
             nn.BatchNorm2d(output_dim),
-            nn.Dropout(),
+            nn.Dropout(p=0.2),
             nn.Conv2d(output_dim, output_dim, kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(output_dim),
-            nn.Dropout(),
+            nn.Dropout(p=0.2),
         )
         self.conv_skip = nn.Sequential(
             nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=1, padding=1),
@@ -73,11 +73,11 @@ class ResUnet(nn.Module):
             nn.Conv2d(channel, filters[0], kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(filters[0]),
-            nn.Dropout(),
+            nn.Dropout(p=0.2),
             nn.Conv2d(filters[0], filters[0], kernel_size=3, padding=1),
             nn.ReLU(),
             nn.BatchNorm2d(filters[0]),
-            nn.Dropout(),
+            nn.Dropout(p=0.2),
         )
         self.input_skip = nn.Sequential(
             nn.Conv2d(channel, filters[0], kernel_size=3, padding=1)

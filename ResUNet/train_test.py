@@ -94,14 +94,14 @@ def train(train_loader, model, optimizer, epoch, best_loss, snapshot_path):
                   format(datetime.now(), epoch, args.max_epochs, i, total_step,
                          loss.data))
 
-    if (epoch + 1) % 1 == 0:
-        meanloss = test(args, model)
-        if meanloss < best_loss:
-            print('new best loss: ', meanloss)
-            best_loss = meanloss
-            torch.save(model.state_dict(), snapshot_path + f'/{args.model_name}-%d.pth' % epoch)
-            print('[Saving Snapshot:]', snapshot_path + f'/{args.model_name}-%d.pth' % epoch)
-    return best_loss, loss_sum / loss_total
+        if (epoch + 1) % 1 == 0:
+            meanloss = test(args, model)
+            if meanloss < best_loss:
+                print('new best loss: ', meanloss)
+                best_loss = meanloss
+                torch.save(model.state_dict(), snapshot_path + f'/{args.model_name}-%d.pth' % epoch)
+                print('[Saving Snapshot:]', snapshot_path + f'/{args.model_name}-%d.pth' % epoch)
+        return best_loss, loss_sum / loss_total
 
 
 if __name__ == "__main__":

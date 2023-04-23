@@ -12,10 +12,10 @@ import torch.backends.cudnn as cudnn
 from torch.utils.data import DataLoader
 from skimage import metrics
 from datasets.dataset_npy import Synapse_dataset, RandomGenerator
+from networks.ResUNet_v2 import ResUnet
 from utils.util import make_dataframe, DF_NAMES
 from utils.custom_metrics import *
 from utils.config import get_device
-from models.TransformerUNetParallel import TransformerUNetParallel
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
@@ -53,7 +53,7 @@ def test(args, model):
                                                                     f"test_{args.model_name}_{args.day_time}")
     os.makedirs(save_path, exist_ok=True)
 
-    db_train = Synapse_dataset(base_dir=args.volume_path, label_dir=args.label_dir, split="train",
+    db_train = Synapse_dataset(base_dir=args.volume_path, label_dir=args.label_dir, split="test",
                                transform=transforms.Compose(
                                    [RandomGenerator(output_size=args.size)]))
     print("The length of test set is: {}".format(len(db_train)))
@@ -82,7 +82,8 @@ def test(args, model):
     frames_meta = make_dataframe(nbr_rows=len(trainloader))
     with torch.no_grad():
         for i_batch, sampled_batch in enumerate(trainloader):
-            image_batch, label_batch = sampled_batch['image'], sampled_batch['label']
+            image_batch, label_batch, case_name = sampled_batch['image'], sampled_batch['label'], \
+                sampled_batch['case_name'][0]
             image_batch, label_batch = image_batch.cuda(), label_batch.cuda()
             # image_batch, label_batch = Variable(image_batch.to(device=args.device)), label_batch.to(device='cuda:0')
             outputs = model(image_batch)
@@ -99,20 +100,26 @@ def test(args, model):
             pcc = pearsonr(x_pre.flatten(), x_true.flatten())
             r2 = r2_metric(x_true, x_pre)
 
-            for k in range(outputs.shape[0]):
-                prediction = torch.squeeze(outputs[k]).cpu().numpy()
-                _image = torch.squeeze(image_batch[k]).cpu().numpy()
-                _label = torch.squeeze(label_batch[k]).cpu().numpy()
+            # for k in range(outputs.shape[0]):
+            #     prediction = torch.squeeze(outputs[k]).cpu().numpy()
+            #     _image = torch.squeeze(image_batch[k]).cpu().numpy()
+            #     _label = torch.squeeze(label_batch[k]).cpu().numpy()
+            #
+            #     # _image = unzscore(_image, image_mediain, image_zscore)
+            #     # prediction = unzscore(prediction, image_mediain, image_zscore)
+            #     # _label = unzscore(_label, label_mediain, label_zscore)
+            #
+            #     tifffile.imwrite(f'{save_path}/{i_batch}_{k}_prediction.tif', data=prediction)
+            #     tifffile.imwrite(f'{save_path}/{i_batch}_{k}_image.tif', data=_image)
+            #     tifffile.imwrite(f'{save_path}/{i_batch}_{k}_label.tif', data=_label)
 
-                # _image = unzscore(_image, image_mediain, image_zscore)
-                # prediction = unzscore(prediction, image_mediain, image_zscore)
-                # _label = unzscore(_label, label_mediain, label_zscore)
+            prediction = torch.squeeze(outputs, dim=0).cpu().numpy()
+            _image = torch.squeeze(image_batch).cpu().numpy()
+            _label = torch.squeeze(label_batch, dim=0).cpu().numpy()
 
-                tifffile.imwrite(f'{save_path}/{i_batch}_{k}_prediction.tif', data=prediction)
-                tifffile.imwrite(f'{save_path}/{i_batch}_{k}_image.tif', data=_image)
-                tifffile.imwrite(f'{save_path}/{i_batch}_{k}_label.tif', data=_label)
-
-            iter_num = iter_num + 1
+            tifffile.imwrite(f'{save_path}/{case_name}_pred.tif', data=prediction)
+            tifffile.imwrite(f'{save_path}/{case_name}_image.tif', data=_image)
+            tifffile.imwrite(f'{save_path}/{case_name}_label.tif', data=_label)
 
             # Save csv.file
             meta_row = dict.fromkeys(DF_NAMES)
@@ -122,8 +129,9 @@ def test(args, model):
             meta_row['Dice'] = dice
             meta_row['mIOU'] = mIoU
             meta_row['r2'] = r2
-            frames_meta.loc[iter_num - 1] = meta_row
+            frames_meta.loc[iter_num] = meta_row
 
+            iter_num = iter_num + 1
             # record
             loss_bank.append(loss.item())
             # loss_bank.append(mse)
@@ -202,7 +210,8 @@ if __name__ == "__main__":
     args.exp = 'TU_' + dataset_name + str(args.size[0])
     snapshot_path = "../model/{}/{}".format(args.exp, args.model_path)
 
-    model = TransformerUNetParallel(channels, heads, size[0], is_residual, bias)
+    # model = TransformerUNetParallel(channels, heads, size[0], is_residual, bias)
+    model = ResUnet(channel=3)
     # load checkpoint
     snapshot = os.path.join(snapshot_path, 'best_model.pth')
     if not os.path.exists(snapshot): snapshot = snapshot.replace('best_model', f'{args.model_name}-' + str(102))
