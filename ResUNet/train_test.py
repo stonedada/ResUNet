@@ -9,7 +9,6 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import transforms
 import os
 from tensorboardX import SummaryWriter
-from tqdm import tqdm
 from inference import *
 import random
 import numpy as np
@@ -18,7 +17,6 @@ import torch.backends.cudnn as cudnn
 from utils.config import get_device
 from networks.ResUNet_v2 import ResUnet
 
-
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
 
 parser = argparse.ArgumentParser()
@@ -26,12 +24,10 @@ parser.add_argument('--root_path', type=str,
                     default='/home/stone/dataset/npy_256/train',
                     help='root dir for data')
 parser.add_argument('--volume_path', type=str,
-                    default='/home/dataset/npy_test/test',
+                    default='/home/dataset/nuclei',
                     help='root dir for validation volume data')
 parser.add_argument('--dataset', type=str,
                     default='Synapse', help='experiment_name')
-parser.add_argument('--label_dir', type=str,
-                    default='./lists/lists_Synapse', help='list dir')
 parser.add_argument('--num_classes', type=int,
                     default=9, help='output channel of network')
 parser.add_argument('--max_iterations', type=int,
@@ -39,7 +35,7 @@ parser.add_argument('--max_iterations', type=int,
 parser.add_argument('--max_epochs', type=int,
                     default=150, help='maximum epoch number to train')
 parser.add_argument('--batch_size', type=int,
-                    default=1, help='batch_size per gpu')
+                    default=8, help='batch_size per gpu')
 parser.add_argument('--n_gpu', type=int, default=4, help='total gpu')
 parser.add_argument('--deterministic', type=int, default=1,
                     help='whether use deterministic training')
@@ -94,14 +90,14 @@ def train(train_loader, model, optimizer, epoch, best_loss, snapshot_path):
                   format(datetime.now(), epoch, args.max_epochs, i, total_step,
                          loss.data))
 
-        if (epoch + 1) % 1 == 0:
-            meanloss = test(args, model)
-            if meanloss < best_loss:
-                print('new best loss: ', meanloss)
-                best_loss = meanloss
-                torch.save(model.state_dict(), snapshot_path + f'/{args.model_name}-%d.pth' % epoch)
-                print('[Saving Snapshot:]', snapshot_path + f'/{args.model_name}-%d.pth' % epoch)
-        return best_loss, loss_sum / loss_total
+    if (epoch + 1) % 1 == 0:
+        meanloss = test(args, model)
+        if meanloss < best_loss:
+            print('new best loss: ', meanloss)
+            best_loss = meanloss
+            torch.save(model.state_dict(), snapshot_path + f'/{args.model_name}-%d.pth' % epoch)
+            print('[Saving Snapshot:]', snapshot_path + f'/{args.model_name}-%d.pth' % epoch)
+    return best_loss, loss_sum / loss_total
 
 
 if __name__ == "__main__":
@@ -121,21 +117,20 @@ if __name__ == "__main__":
         'Synapse': {
             'root_path': '/home/dataset/npy_256/train',
             'label_dir': '/home/dataset/npy_256/train_label',
-            'num_classes': 9,
+            'volume_path': '/home/dataset/npy_256',
         },
     }
-
-    args.num_classes = dataset_config[dataset_name]['num_classes']
     args.root_path = dataset_config[dataset_name]['root_path']
     args.label_dir = dataset_config[dataset_name]['label_dir']
-
+    args.volume_path = dataset_config[dataset_name]['volume_path']
     # ---- build models ----
 
     # change to your model #
     channels = (16, 32, 64, 128, 256)
     size = (256, 256)
+    task = 'F-actin'
 
-    model_path = f'size_{size[0]}_level_{len(channels)}_ch_{channels[-1]}'
+    model_path = f'size_{size[0]}_level_{len(channels)}_ch_{channels[-1]}_{task}'
     device = get_device()
     print(device, torch.cuda.device_count())
 
@@ -169,7 +164,6 @@ if __name__ == "__main__":
                                    [RandomGenerator(output_size=size)]))
     print("The length of train set is: {}".format(len(db_train)))
 
-
     def worker_init_fn(worker_id):
         random.seed(args.seed + worker_id)
 
@@ -197,4 +191,4 @@ if __name__ == "__main__":
         best_loss, t = train(train_loader, model, optimizer, epoch, best_loss, snapshot_path)
         train_loss_history.append(t)
     writer.close()
-    np.save('./ResUNet_train_loss.npy', np.array(train_loss_history))
+    np.save(f'./ResUNet_train_loss_{task}.npy', np.array(train_loss_history))

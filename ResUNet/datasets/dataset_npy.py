@@ -56,7 +56,6 @@ class Synapse_dataset(Dataset):
             label_name = slice_name.replace('c001', 'c000')
             label_path = self.label_dir + label_name
             image = np.load(data_path)
-            print('image shape:', image.shape)
             label = np.load(label_path)
 
         sample = {'image': image, 'label': label}

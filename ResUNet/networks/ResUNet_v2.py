@@ -27,6 +27,7 @@ class ResidualConv(nn.Module):
     def forward(self, x):
         return self.conv_block(x) + self.conv_skip(x)
 
+
 class UpResidualConv(nn.Module):
     def __init__(self, input_dim, output_dim, stride, padding):
         super(UpResidualConv, self).__init__()
@@ -102,8 +103,12 @@ class ResUnet(nn.Module):
         self.up_residual_conv4 = UpResidualConv(filters[1] + filters[0], filters[0], 1, 1)
 
         self.output_layer = nn.Sequential(
-            nn.Conv2d(filters[0], 1, 1, 1),
-            nn.Sigmoid(),
+            # nn.Conv2d(filters[0], 1, 1, 1),
+            # nn.Sigmoid(),
+            nn.Conv2d(filters[0], 1, kernel_size=3, stride=1, padding=1),
+            nn.Conv2d(1, 1, kernel_size=3, stride=1, padding=1),
+            nn.Linear(256, 256),
+            nn.Identity(),
         )
 
     def forward(self, x):
@@ -142,6 +147,7 @@ class ResUnet(nn.Module):
 
 from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
+
 
 # from torchsummary import summary
 class TrainSet(Dataset):

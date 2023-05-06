@@ -2,12 +2,12 @@
 # @Author   :   stone
 # @Github   :   https://github.com/stonedada
 import sys
-
 import math
+import sklearn
 import torch
 import numpy as np
 from scipy.stats._stats_py import _sum_of_squares
-
+from sklearn.metrics import f1_score
 
 def mean_dice(y_true, y_pred, thresh):
     """
@@ -66,6 +66,44 @@ def r2_metric(target, prediction):
     cur_r2 = 1 - (ss_res / (ss_tot + 1e-8))
     return cur_r2
 
+
+def dice_metric(target, prediction):
+    """Dice similarity coefficient (F1 score) of binary target and prediction.
+    Reports global metric.
+    Not using mask decorator for binary data evaluation.
+
+    :param np.array target: ground truth array
+    :param np.array prediction: model prediction
+    :return float dice: Dice for binarized data
+    """
+    target_bin = binarize_array(target)
+    pred_bin = binarize_array(prediction)
+    return f1_score(target_bin, pred_bin, average='micro')
+
+
+def iou_metric(target, prediction):
+    """
+    compute mean iou for binary segmentation map via numpy
+    """
+    y_pred = binarize_array(prediction)
+    y_true = binarize_array(target)
+    intersection = np.sum(np.abs(y_pred * y_true))
+    mask_sum = np.sum(np.abs(y_true)) + np.sum(np.abs(y_pred))
+    union = mask_sum - intersection
+
+    smooth = .001
+    iou = (intersection + smooth) / (union + smooth)
+    return iou
+
+
+def binarize_array(im):
+    """Binarize image
+
+    :param np.array im: Prediction or target array
+    :return np.array im_bin: Flattened and binarized array
+    """
+    im_bin = (im.flatten() / im.max()) > .5
+    return im_bin.astype(np.uint8)
 
 def tensor_to_tif(input: torch.Tensor, channel: int = 32, shape: tuple = (256, 256),
                   save_path: str = "/home/yingmuzhi/microDL_3D/_yingmuzhi/output_tiff.tiff", dtype: str = "uint16",
